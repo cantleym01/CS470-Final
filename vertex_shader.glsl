@@ -32,51 +32,33 @@
 // Please contact the author of this library if you have any questions.
 // Author: Victor Fragoso (victor.fragoso@mail.wvu.edu)
 
-#define _USE_MATH_DEFINES  // For using M_PI.
-#include <cmath>
-#include "transformations.h"
-#include <Eigen/Core>
-#include <Eigen/Geometry>
+// Vertex shader.
+// Every shader should declare its version.
+// Vertex shader follows standard 3.3.0.
+// This shader declares/expexts an input variable named position. This input
+// should have been loaded into GPU memory for its processing. The shader
+// essentially sets the gl_Position -- an already defined variable -- that
+// determines the final position for a vertex.
+// Note that the position variable is of type vec3, which is a 3D dimensional
+// vector. The layout keyword determines the way the VAO buffer is arranged in
+// memory. This way the shader can read the vertices correctly.
 
-namespace wvu {
-// Compute translation transformation matrix.
-// Params:
-//   offset  The translation offset vector.
-Eigen::Matrix4f ComputeTranslationMatrix(const Eigen::Vector3f& offset) 
-{
-	Eigen::Matrix4f retMatrix = Eigen::Matrix4f::Identity();
-  	retMatrix.col(3) = offset.homogeneous();
-  	return retMatrix;
+#version 330 core
+
+layout (location = 0) in vec3 position;
+layout (location = 1) in vec3 color;
+layout (location = 2) in vec2 texCoord;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+// Passing variables from shader to shader.
+out vec4 ourColor;
+out vec2 TexCoord;
+
+void main() {
+  // Compute MVP.
+  gl_Position = projection * view * model * vec4(position, 1.0f);
+  ourColor = vec4(color, 1.0f);
+  TexCoord = texCoord;
 }
-
-// Compute rotation transformation matrix.
-// Params:
-//   rotation_axis  The rotation axis.
-//   angle_in_radians  Angle in radians.
-Eigen::Matrix4f ComputeRotationMatrix(const Eigen::Vector3f& rotation_axis,
-                                      const float angle_in_radians) {
-	Eigen::Matrix4f retMatrix = Eigen::Matrix4f::Identity();
-  	Eigen::AngleAxisf rotation(angle_in_radians, rotation_axis);
-  	Eigen::Matrix3f rot = rotation.matrix();
-  	retMatrix.block(0, 0, 3, 3)  = rot;
-  	return retMatrix;
-}
-
-// Compute scaling transformation matrix.
-// Params:
-//   scale  Scale factor.
-Eigen::Matrix4f ComputeScalingMatrix(const float scale) {
-  	Eigen::Matrix4f retMatrix = Eigen::Matrix4f::Identity();
-	retMatrix = retMatrix * scale;
-  return retMatrix;
-}
-
-// Converts angles in degrees to radians.
-// Parameters:
-//   angle_in_degrees  The angle in degrees.
-float ConvertDegreesToRadians(const float angle_in_degrees) {
-
-  return angle_in_degrees * (M_PI / 180.0);
-}
-
-}  // namespace wvu

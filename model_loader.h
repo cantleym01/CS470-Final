@@ -32,51 +32,39 @@
 // Please contact the author of this library if you have any questions.
 // Author: Victor Fragoso (victor.fragoso@mail.wvu.edu)
 
-#define _USE_MATH_DEFINES  // For using M_PI.
-#include <cmath>
-#include "transformations.h"
+#ifndef MODEL_LOADER_H_
+#define MODEL_LOADER_H_
+
+#include <string>
+#include <vector>
 #include <Eigen/Core>
-#include <Eigen/Geometry>
+#include <Eigen/StdVector>
+
+EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Vector2f)
 
 namespace wvu {
-// Compute translation transformation matrix.
-// Params:
-//   offset  The translation offset vector.
-Eigen::Matrix4f ComputeTranslationMatrix(const Eigen::Vector3f& offset) 
-{
-	Eigen::Matrix4f retMatrix = Eigen::Matrix4f::Identity();
-  	retMatrix.col(3) = offset.homogeneous();
-  	return retMatrix;
-}
+// A face defines the vertices, the normals, and the texels to use for a
+// triangle. Some objs only define the vertices, so check the size of
+// the vectors first.
+struct Face {
+  std::vector<int> vertex_indices;
+  std::vector<int> normal_indices;
+  std::vector<int> texel_indices;
+};
 
-// Compute rotation transformation matrix.
-// Params:
-//   rotation_axis  The rotation axis.
-//   angle_in_radians  Angle in radians.
-Eigen::Matrix4f ComputeRotationMatrix(const Eigen::Vector3f& rotation_axis,
-                                      const float angle_in_radians) {
-	Eigen::Matrix4f retMatrix = Eigen::Matrix4f::Identity();
-  	Eigen::AngleAxisf rotation(angle_in_radians, rotation_axis);
-  	Eigen::Matrix3f rot = rotation.matrix();
-  	retMatrix.block(0, 0, 3, 3)  = rot;
-  	return retMatrix;
-}
-
-// Compute scaling transformation matrix.
-// Params:
-//   scale  Scale factor.
-Eigen::Matrix4f ComputeScalingMatrix(const float scale) {
-  	Eigen::Matrix4f retMatrix = Eigen::Matrix4f::Identity();
-	retMatrix = retMatrix * scale;
-  return retMatrix;
-}
-
-// Converts angles in degrees to radians.
-// Parameters:
-//   angle_in_degrees  The angle in degrees.
-float ConvertDegreesToRadians(const float angle_in_degrees) {
-
-  return angle_in_degrees * (M_PI / 180.0);
-}
-
+// Loads a 3D model in OBJ format. Retruns true when successful and false
+// otherwise.
+// Paremters:
+//   filepath  The filepath of the model.
+//   vertices  The vertices of the model.
+//   texels  The texels for the model and vertices.
+//   normals  The normal vectors.
+//   faces  The faces of the model (i.e., triangles).
+bool LoadObjModel(const std::string& filepath,
+                  std::vector<Eigen::Vector3f>* vertices,
+                  std::vector<Eigen::Vector2f>* texels,
+                  std::vector<Eigen::Vector3f>* normals,
+                  std::vector<Face>* faces);
 }  // namespace wvu
+
+#endif //  MODEL_LOADER_H_

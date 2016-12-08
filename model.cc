@@ -33,10 +33,12 @@
 // Author: Victor Fragoso (victor.fragoso@mail.wvu.edu)
 
 #include "model.h"
+#include <iostream>
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <GL/glew.h>
+#include <GLFW/glfw3.h>
 
 #include "shader_program.h"
 #include "transformations.h"
@@ -51,6 +53,7 @@ Model::Model(const Eigen::Vector3f& orientation,
   vertex_buffer_object_id_ = 0;
   vertex_array_object_id_ = 0;
   element_buffer_object_id_ = 0;
+  speed = 1;
 }
 
 Model::Model(const Eigen::Vector3f& orientation,
@@ -64,16 +67,22 @@ Model::Model(const Eigen::Vector3f& orientation,
   vertex_buffer_object_id_ = 0;
   vertex_array_object_id_ = 0;
   element_buffer_object_id_ = 0;
+  speed = 1;
 }
 
 Model::~Model() {
-  // TODO: Delete the buffers in GPU.
+    	glDeleteVertexArrays(1, &vertex_array_object_id_);
+  	glDeleteBuffers(1, &vertex_buffer_object_id_);
 }
 
 // Builds the model matrix from the orientation and position members.
-Eigen::Matrix4f Model::ComputeModelMatrix() {
-  // TODO: Implment me!
-  return Eigen::Matrix4f::Random();
+Eigen::Matrix4f Model::ComputeModelMatrix() 
+{
+	Eigen::Matrix4f translation = ComputeTranslationMatrix(position_);
+	Eigen::Matrix4f rotation = ComputeRotationMatrix(orientation_.normalized(), orientation_.norm() * speed);
+	Eigen::Matrix4f scale = ComputeScalingMatrix(1);
+
+  	return translation * rotation * scale;
 }
 
 // Setters set members by *copying* input parameters.
@@ -134,16 +143,87 @@ const GLuint Model::element_buffer_object_id() {
   return element_buffer_object_id_;
 }
 
-void Model::SetVerticesIntoGpu() {
-  // TODO: Implement me!
+void Model::SetVerticesIntoGpu() 
+{
+	//Create and Set the VAO
+  	constexpr int kNumVertexArrays = 1;
+  	glGenVertexArrays(kNumVertexArrays, &vertex_array_object_id_);
+  	glBindVertexArray(vertex_array_object_id_);
+
+  	//Create and Set the VBO
+  	GLuint vertex_buffer_object_id;
+  	glGenBuffers(1, &vertex_buffer_object_id);
+  	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_object_id);
+  	const Eigen::MatrixXf& vertices = vertices_;
+  	const int vertices_size_in_bytes =
+      		vertices.rows() * vertices.cols() * sizeof(vertices(0, 0));
+  	glBufferData(GL_ARRAY_BUFFER,
+               	     vertices_size_in_bytes,
+                     vertices.data(),
+                     GL_STATIC_DRAW);
+  	constexpr GLuint kIndex = 0;
+  	constexpr GLuint kNumElementsPerVertex = 3;
+  	constexpr GLuint kStride = kNumElementsPerVertex * sizeof(vertices(0, 0));
+  	const GLvoid* offset_ptr = nullptr;
+  	glVertexAttribPointer(kIndex, kNumElementsPerVertex, GL_FLOAT, GL_FALSE,
+                              kStride, offset_ptr);
+  	glEnableVertexAttribArray(kIndex);
+
+	// Configure the texels.
+  	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE,
+                        kStride, offset_ptr);
+  	glEnableVertexAttribArray(2);
+
+  	glBindBuffer(GL_ARRAY_BUFFER, 0);
+  	vertex_buffer_object_id_ = vertex_buffer_object_id;
+
+	//Create and Set the EBO
+  	GLuint element_buffer_object_id;
+  	glGenBuffers(1, &element_buffer_object_id);
+  	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer_object_id);
+  	const std::vector<GLuint>& indices = indices_;
+  	const int indices_size_in_bytes = indices.size() * sizeof(indices[0]);
+  	glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+               	     indices_size_in_bytes,
+                     indices.data(),
+                     GL_STATIC_DRAW);
+  	element_buffer_object_id_ = element_buffer_object_id;
+
+  	// Disable the created VAO.
+  	glBindVertexArray(0);
 }
 
 void Model::Draw(const ShaderProgram& shader_program,
                  const Eigen::Matrix4f& projection,
-                 const Eigen::Matrix4f& view) {
-  // The model transformation must be computed using ComputeModelMatrix().
-  const Eigen::Matrix4f model = ComputeModelMatrix();
-  // TODO: Implement me!
+                 const Eigen::Matrix4f& view,
+		 const GLuint texture_id) 
+{
+  	// Get the locations of the uniform variables.
+  	const GLint model_location = glGetUniformLocation(shader_program.shader_program_id(), "model");
+  	const GLint view_location = glGetUniformLocation(shader_program.shader_program_id(), "view");
+  	const GLint projection_location = glGetUniformLocation(shader_program.shader_program_id(), "projection");
+	const GLint vertex_color_location = glGetUniformLocation(shader_program.shader_program_id(), "vertex_color");
+
+  	// The model transformation must be computed using ComputeModelMatrix().
+	speed = .5f * static_cast<GLfloat>(glfwGetTime());
+  	const Eigen::Matrix4f model = ComputeModelMatrix();
+
+	// Bind texture.
+  	glBindTexture(GL_TEXTURE_2D, texture_id);
+
+	glUniformMatrix4fv(model_location, 1, GL_FALSE, model.data());
+  	glUniformMatrix4fv(view_location, 1, GL_FALSE, view.data());
+  	glUniformMatrix4fv(projection_location, 1, GL_FALSE, projection.data());
+	GLfloat color_scalar = static_cast<GLfloat>(glfwGetTime());
+
+	//send the color
+	Eigen::Vector4f color(0.5f, 0.5f, 0.5f, 1.0f);
+  	glUniform4fv(vertex_color_location, 1, color.data());
+	
+	glBindVertexArray(vertex_array_object_id_);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+  	glDrawElements(GL_TRIANGLES, indices_.size(), GL_UNSIGNED_INT, 0);
+  	glBindVertexArray(0);
 }
 
 }  // namespace wvu

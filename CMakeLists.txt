@@ -38,7 +38,7 @@ IF (COMMAND cmake_policy)
   CMAKE_POLICY(SET CMP0003 NEW)
 ENDIF (COMMAND cmake_policy)
 
-PROJECT(CS470_ASSIGNMENT_4 C CXX)
+PROJECT(CS470_MODEL_LOADER C CXX)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR})
 
 # These lines below only work for Cmake 3.1 >.
@@ -99,16 +99,17 @@ INCLUDE_DIRECTORIES(
   ${OPENGL_INCLUDE_DIR}
   ${GLEW_INCLUDE_DIRS}
   libraries/glfw-3.1.2/include
-  ${GFLAGS_INCLUDE_DIRS}
-  ${GLOG_INCLUDE_DIRS}
   ${cimg_SOURCE_DIR}
   ${cimg_INCLUDE_DIR}
   ${gtest_SOURCE_DIR}/include
-  ${gtest_SOURCE_DIR})
+  ${gtest_SOURCE_DIR}
+  ${GFLAGS_INCLUDE_DIRS}
+  ${GLOG_INCLUDE_DIRS})
 
 ADD_EXECUTABLE(draw_scene draw_scene.cc
   shader_program.cc
   model.cc
+  model_loader.cc
   transformations.cc
   camera_utils.cc)
 TARGET_LINK_LIBRARIES(draw_scene
@@ -119,28 +120,3 @@ TARGET_LINK_LIBRARIES(draw_scene
   ${GFLAGS_LIBRARIES}
   ${GLOG_LIBRARIES}
   ${blas_LIBRARIES})
-
-ADD_LIBRARY(test_main test/test_main.cc)
-# TODO(vfragoso): See if you can trim the libraries.
-TARGET_LINK_LIBRARIES(test_main
-  gtest
-  ${GFLAGS_LIBRARIES}
-  ${GLOG_LIBRARIES})
-
-# No longer needed for Assignment 4.
-# MACRO (GTEST NAME)
-#   ADD_EXECUTABLE(${NAME}_tests ${NAME}_tests.cc transformations.cc model.cc)
-#   TARGET_LINK_LIBRARIES(${NAME}_tests test_main gtest ${ARGN}
-#     glfw
-#     ${GFLAGS_LIBRARIES}
-#     ${GLOG_LIBRARIES}
-#     ${OPENGL_LIBRARIES}
-#     ${GLEW_LIBRARIES}
-#     ${GLFW_LIBRARIES})
-
-#   ADD_TEST(NAME ${NAME}
-#     COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${NAME})
-# ENDMACRO (GTEST)
-
-# # Assignment source.
-# GTEST(assignment)

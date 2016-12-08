@@ -1,0 +1,71 @@
+Example One
+------------------------------------------------
+(*
+*	It will request input for 2 integers and then an operator.
+*)
+
+
+Program Basic_Calculator;
+Var
+    Operator: Char;
+    Opt1,Opt2 : Integer;
+    Sum, Subtract, Multiply, Divide, Result: Integer;
+Begin
+    Opt1 := 5; Opt2 := 9;
+    write('Enter Two Numbers : ');
+    readln(Opt1,Opt2);
+    writeln;
+    write('Select Operators +,-,* and / : ');
+    readln(Operator);
+    writeln;
+
+    if (Operator = '+') then
+    Begin
+        Sum := (Opt1 + Opt2);
+        Result := Sum;
+    End
+    else if (Operator = '-') then
+    Begin
+        Subtract := (Opt1 - Opt2);
+        Result := Subtract;
+    End
+    else if (Operator = '*') then
+    Begin
+        Multiply := (Opt1 * Opt2);
+        Result := Multiply;
+    End
+    else if (Operator = '/') then
+    Begin
+        Divide := (Opt1 DIV Opt2);
+        Result := Divide;
+    End;
+    writeln;
+    writeln;
+    Write('The result is ' ,Result,'.');
+    readln;
+End.
+            
+
+Example Two
+------------------------------------------------
+(*
+*	This program will prompt the user for input on how many
+*	Fibonacci numbers that the user wants. It will then display the *	numbers starting from 1.
+*)
+PROGRAM Fibonacci;
+VAR
+    First, Second, Temp : Integer;
+    fib, i : Integer;
+BEGIN
+    write('Enter the amount of Fibonacci Numbers: ');
+    readln(fib);
+    First := 0;
+    Second := 1;
+    for i := 0 to fib do
+    begin
+      Temp := First + Second;
+      First := Second;
+      Second := Temp;
+      writeln(Temp);
+    end
+END.

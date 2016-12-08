@@ -32,51 +32,21 @@
 // Please contact the author of this library if you have any questions.
 // Author: Victor Fragoso (victor.fragoso@mail.wvu.edu)
 
-#define _USE_MATH_DEFINES  // For using M_PI.
-#include <cmath>
-#include "transformations.h"
-#include <Eigen/Core>
-#include <Eigen/Geometry>
+// Fragment shader.
+// Fragment shader follows standard 3.3.0. The goal of the fragment shader is to
+// calculate the color of the pixel corresponding to a vertex. This is why we
+// declare a variable named color of type vec4 (4D vector) as its output. This
+// shader sets the output color to a (1.0, 0.5, 0.2, 1.0) using an RGBA format.
 
-namespace wvu {
-// Compute translation transformation matrix.
-// Params:
-//   offset  The translation offset vector.
-Eigen::Matrix4f ComputeTranslationMatrix(const Eigen::Vector3f& offset) 
+#version 330 core
+
+in vec4 ourColor;
+out vec4 color;
+in vec2 TexCoord;
+
+uniform sampler2D tex;
+
+void main() 
 {
-	Eigen::Matrix4f retMatrix = Eigen::Matrix4f::Identity();
-  	retMatrix.col(3) = offset.homogeneous();
-  	return retMatrix;
+  color = texture(tex, TexCoord);
 }
-
-// Compute rotation transformation matrix.
-// Params:
-//   rotation_axis  The rotation axis.
-//   angle_in_radians  Angle in radians.
-Eigen::Matrix4f ComputeRotationMatrix(const Eigen::Vector3f& rotation_axis,
-                                      const float angle_in_radians) {
-	Eigen::Matrix4f retMatrix = Eigen::Matrix4f::Identity();
-  	Eigen::AngleAxisf rotation(angle_in_radians, rotation_axis);
-  	Eigen::Matrix3f rot = rotation.matrix();
-  	retMatrix.block(0, 0, 3, 3)  = rot;
-  	return retMatrix;
-}
-
-// Compute scaling transformation matrix.
-// Params:
-//   scale  Scale factor.
-Eigen::Matrix4f ComputeScalingMatrix(const float scale) {
-  	Eigen::Matrix4f retMatrix = Eigen::Matrix4f::Identity();
-	retMatrix = retMatrix * scale;
-  return retMatrix;
-}
-
-// Converts angles in degrees to radians.
-// Parameters:
-//   angle_in_degrees  The angle in degrees.
-float ConvertDegreesToRadians(const float angle_in_degrees) {
-
-  return angle_in_degrees * (M_PI / 180.0);
-}
-
-}  // namespace wvu

@@ -31,9 +31,26 @@
 //
 // Please contact the author of this library if you have any questions.
 // Author: Victor Fragoso (victor.fragoso@mail.wvu.edu)
+// Use the right namespace for google flags (gflags).
+#ifdef GFLAGS_NAMESPACE_GOOGLE
+#define GLUTILS_GFLAGS_NAMESPACE google
+#else
+#define GLUTILS_GFLAGS_NAMESPACE gflags
+#endif
 
+// Include first C-Headers.
+#define _USE_MATH_DEFINES  // For using M_PI.
+#include <cmath>
+// Include second C++-Headers.
 #include <iostream>
 #include <string>
+#include <vector>
+
+// Include library headers.
+// Include CImg library to load textures.
+// The macro below disables the capabilities of displaying images in CImg.
+#define cimg_display 0
+#include <CImg.h>
 
 // The macro below tells the linker to use the GLEW library in a static way.
 // This is mainly for compatibility with Windows.
@@ -48,6 +65,11 @@
 // See http://www.glfw.org/ for more information.
 #include <GLFW/glfw3.h>
 
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+#include <gflags/gflags.h>
+#include <glog/logging.h>
+
 // Shader program.
 #include "shader_program.h"
 
@@ -60,13 +82,21 @@
 // Camera utils.
 #include "camera_utils.h"
 
+// Model Loader
+#include "model_loader.h"
+
+//define the file paths
+DEFINE_string(boat_filepath, "/home/macbad2012/assignment4/boat.obj", "Filepath of the boat's model to load.");
+DEFINE_string(boatTex_filepath, "/home/macbad2012/assignment4/wood.bmp", 
+              "Filepath of the texture of the boat.");
+
 // Annonymous namespace for constants and helper functions.
 namespace {
 using wvu::Model;
 
 // Window dimensions.
-constexpr int kWindowWidth = 640;
-constexpr int kWindowHeight = 480;
+constexpr int kWindowWidth = 1000;
+constexpr int kWindowHeight = 500;
 
 // GLSL shaders.
 // Every shader should declare its version.
@@ -81,12 +111,17 @@ constexpr int kWindowHeight = 480;
 const std::string vertex_shader_src =
     "#version 330 core\n"
     "layout (location = 0) in vec3 position;\n"
+    "layout (location = 1) in vec3 color;\n"
+    "layout (location = 2) in vec2 texCoord;\n"
     "uniform mat4 model;\n"
     "uniform mat4 view;\n"
     "uniform mat4 projection;\n"
-    "\n"
+    "out vec4 ourColor;\n"
+    "out vec2 TexCoord;\n"
     "void main() {\n"
     "gl_Position = projection * view * model * vec4(position, 1.0f);\n"
+    "ourColor = vec4(color, 1.0f);\n"
+    "TexCoord = texCoord;\n"
     "}\n";
 
 // Fragment shader follows standard 3.3.0. The goal of the fragment shader is to
@@ -95,9 +130,12 @@ const std::string vertex_shader_src =
 // shader sets the output color to a (1.0, 0.5, 0.2, 1.0) using an RGBA format.
 const std::string fragment_shader_src =
     "#version 330 core\n"
+    "in vec4 ourColor;\n"
     "out vec4 color;\n"
+    "in vec2 TexCoord;\n"
+    "uniform sampler2D tex;\n"
     "void main() {\n"
-    "color = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
+    "color = texture(tex, TexCoord);\n"
     "}\n";
 
 // Error callback function. This function follows the required signature of
@@ -151,13 +189,45 @@ void ConfigureViewPort(GLFWwindow* window) {
 void ClearTheFrameBuffer() {
   // Sets the initial color of the framebuffer in the RGBA, R = Red, G = Green,
   // B = Blue, and A = alpha.
+  glEnable(GL_DEPTH_TEST);
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
   // Tells OpenGL to clear the Color buffer.
-  glClear(GL_COLOR_BUFFER_BIT);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
+
+GLuint LoadTexture(const std::string& texture_filepath) {
+  cimg_library::CImg<unsigned char> image;
+  image.load(texture_filepath.c_str());
+
+  const int width = image.width();
+  const int height = image.height();
+
+  // OpenGL expects to have the pixel values interleaved (e.g., RGBD, ...). CImg
+  // flatens out the planes. To have them interleaved, CImg has to re-arrange
+  // the values.
+  // Also, OpenGL has the y-axis of the texture flipped.
+  image.permute_axes("cxyz");
+  GLuint texture_id;
+  glGenTextures(1, &texture_id);
+  glBindTexture(GL_TEXTURE_2D, texture_id);
+  // We are configuring texture wrapper, each per dimension,s:x, t:y.
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  // Define the interpolation behavior for this texture.
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  /// Sending the texture information to the GPU.
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height,
+               0, GL_RGB, GL_UNSIGNED_BYTE, image.data());
+  // Generate a mipmap.
+  glGenerateMipmap(GL_TEXTURE_2D);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  return texture_id;
 }
 
 bool CreateShaderProgram(wvu::ShaderProgram* shader_program) {
   if (shader_program == nullptr) return false;
+
   shader_program->LoadVertexShaderFromString(vertex_shader_src);
   shader_program->LoadFragmentShaderFromString(fragment_shader_src);
   std::string error_info_log;
@@ -176,36 +246,77 @@ void RenderScene(const wvu::ShaderProgram& shader_program,
                  const Eigen::Matrix4f& projection,
                  const Eigen::Matrix4f& view,
                  std::vector<Model*>* models_to_draw,
-                 GLFWwindow* window) {
+                 GLFWwindow* window,
+		 std::vector<GLuint> textures) {
   // Clear the buffer.
   ClearTheFrameBuffer();
   // Let OpenGL know that we want to use our shader program.
   shader_program.Use();
-  // Render the models in a wireframe mode.
-  glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
   // Draw the models.
-  // TODO: For every model in models_to_draw, call its Draw() method, passing
-  // the view and projection matrices.
-  // Let OpenGL know that we are done with our vertex array object.
-  glBindVertexArray(0);
+  for (int i = 0; i < (*models_to_draw).size(); i++)
+  {
+	(*(*models_to_draw)[i]).Draw(shader_program, projection, view, textures[i]);
+  }
 }
 
-void ConstructModels(std::vector<Model*>* models_to_draw) {
-  // TODO: Prepare your models here.
-  // 1. Construct models by setting their vertices and poses.
-  // 2. Create your models in the heap and add the pointers to models_to_draw.
-  // 3. For every added model in models to draw, set the GPU buffers by
-  // calling the method model method SetVerticesIntoGPU().
+void ConstructModels(std::vector<Model*>* models_to_draw) 
+{
+  // Load model.
+  std::vector<Eigen::Vector3f> model_vertices;
+  std::vector<Eigen::Vector2f> model_texels;
+  std::vector<Eigen::Vector3f> model_normals;
+  std::vector<wvu::Face> model_faces;
+  if (!wvu::LoadObjModel(FLAGS_boat_filepath,
+                         &model_vertices,
+                         &model_texels,
+                         &model_normals,
+                         &model_faces)) {
+    std::cout << "Could not load model: " << FLAGS_boat_filepath << std::endl;
+  }
+  std::cout << "Model succesfully loaded! " << std::endl
+            << " Num. Vertices=" << model_vertices.size() << std::endl
+	    << " Num. Texels=" << model_texels.size() << std::endl
+            << " Num. Triangles=" << model_faces.size() << std::endl;
+
+  Eigen::MatrixXf vertices(3, model_vertices.size());
+  for (int col = 0; col < model_vertices.size(); ++col) 
+  {
+    vertices.col(col) = model_vertices[col];
+  }
+
+  std::vector<GLuint> indices;
+  for (int face_id = 0; face_id < model_faces.size(); ++face_id) 
+  {
+    const wvu::Face& face = model_faces[face_id];
+    indices.push_back(face.vertex_indices[0]);
+    indices.push_back(face.vertex_indices[1]);
+    indices.push_back(face.vertex_indices[2]);
+  }
+
+  Model* model = new Model(Eigen::Vector3f(0, 3, 0),  // Orientation of object.
+              		   Eigen::Vector3f(0, -.5, -3),  // Position of object.
+              		   vertices,
+              		   indices);
+
+  (*model).SetVerticesIntoGpu();
+
+  (*models_to_draw).push_back(model);
 }
 
 void DeleteModels(std::vector<Model*>* models_to_draw) {
-  // TODO: Implement me!
   // Call delete on each models to draw.
+  for (int i = 0; i < (*models_to_draw).size(); i++)
+  {
+	delete (*models_to_draw)[i];
+  }
 }
 
 }  // namespace
 
 int main(int argc, char** argv) {
+  GLUTILS_GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
+  google::InitGoogleLogging(argv[0]);
   // Initialize the GLFW library.
   if (!glfwInit()) {
     return -1;
@@ -218,7 +329,7 @@ int main(int argc, char** argv) {
   SetWindowHints();
 
   // Create a window and its OpenGL context.
-  const std::string window_name = "Assignment 3";
+  const std::string window_name = "Assignment 4";
   GLFWwindow* window = glfwCreateWindow(kWindowWidth,
                                         kWindowHeight,
                                         window_name.c_str(),
@@ -265,10 +376,13 @@ int main(int argc, char** argv) {
                                               near_plane, far_plane);
   const Eigen::Matrix4f view = Eigen::Matrix4f::Identity();
 
+  const GLuint tex = LoadTexture(FLAGS_boatTex_filepath);
+  std::vector<GLuint> textures = {tex};
+
   // Loop until the user closes the window.
   while (!glfwWindowShouldClose(window)) {
     // Render the scene!
-    RenderScene(shader_program, projection, view, &models_to_draw, window);
+    RenderScene(shader_program, projection, view, &models_to_draw, window, textures);
 
     // Swap front and back buffers.
     glfwSwapBuffers(window);

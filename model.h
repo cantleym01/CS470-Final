@@ -87,7 +87,8 @@ public:
   //   view  The camera pose matrix (world -> camera transformation matrix).
   void Draw(const ShaderProgram& shader_program,
             const Eigen::Matrix4f& projection,
-            const Eigen::Matrix4f& view);
+            const Eigen::Matrix4f& view,
+	    const GLuint texture_id);
 
   // Sets the orientation or pose of the object using the Rodrigues
   // vector: angle-axis vector where the angle is the norm of the vector.
@@ -150,6 +151,8 @@ private:
   GLuint vertex_array_object_id_;
   // Element buffer object id.
   GLuint element_buffer_object_id_;
+  //speed
+  float speed;
 };
 
 }  // namespace wvu
