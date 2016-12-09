@@ -89,6 +89,8 @@ public:
             const Eigen::Matrix4f& projection,
             const Eigen::Matrix4f& view,
 	    const GLuint texture_id);
+		
+  void set_rotation_speed(const float rotation_speed);
 
   // Sets the orientation or pose of the object using the Rodrigues
   // vector: angle-axis vector where the angle is the norm of the vector.
@@ -96,6 +98,8 @@ public:
 
   // Sets the position of the model.
   void set_position(const Eigen::Vector3f& position);
+  
+  void set_bob_speed(const float bob_speed);
 
   // If we want to avoid copying, we can return a pointer to
   // the member. Note that making public the attributes work
@@ -107,6 +111,10 @@ public:
 
   // Returns a mutable position.
   Eigen::Vector3f* mutable_position();
+  
+  float rotation_speed();
+  
+  float bob_speed();
 
   // Getters, return a const reference to the member.
   // Gets the orientation or pose of the object in the world.
@@ -152,7 +160,13 @@ private:
   // Element buffer object id.
   GLuint element_buffer_object_id_;
   //speed
-  float speed;
+  float speed_rot;
+  
+  double speed_bob;
+  
+  float rot_speed_;
+  
+  float bob_speed_;
 };
 
 }  // namespace wvu

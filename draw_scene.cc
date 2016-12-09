@@ -86,8 +86,8 @@
 #include "model_loader.h"
 
 //define the file paths
-DEFINE_string(boat_filepath, "/home/macbad2012/assignment4/boat.obj", "Filepath of the boat's model to load.");
-DEFINE_string(boatTex_filepath, "/home/macbad2012/assignment4/wood.bmp", 
+DEFINE_string(boat_filepath, "./boat.obj", "Filepath of the boat's model to load.");
+DEFINE_string(boatTex_filepath, "./wood.bmp", 
               "Filepath of the texture of the boat.");
 
 // Annonymous namespace for constants and helper functions.
@@ -111,8 +111,7 @@ constexpr int kWindowHeight = 500;
 const std::string vertex_shader_src =
     "#version 330 core\n"
     "layout (location = 0) in vec3 position;\n"
-    "layout (location = 1) in vec3 color;\n"
-    "layout (location = 2) in vec2 texCoord;\n"
+    "layout (location = 1) in vec2 texCoord;\n"
     "uniform mat4 model;\n"
     "uniform mat4 view;\n"
     "uniform mat4 projection;\n"
@@ -120,7 +119,7 @@ const std::string vertex_shader_src =
     "out vec2 TexCoord;\n"
     "void main() {\n"
     "gl_Position = projection * view * model * vec4(position, 1.0f);\n"
-    "ourColor = vec4(color, 1.0f);\n"
+    "ourColor = vec4(0.0f, 0.0f, 0.0f, 1.0f);\n"
     "TexCoord = texCoord;\n"
     "}\n";
 
@@ -195,7 +194,7 @@ void ClearTheFrameBuffer() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-GLuint LoadTexture(const std::string& texture_filepath) {
+GLuint LoadTexture(const std::string& texture_filepath, GLuint texture_mode) {
   cimg_library::CImg<unsigned char> image;
   image.load(texture_filepath.c_str());
 
@@ -211,8 +210,8 @@ GLuint LoadTexture(const std::string& texture_filepath) {
   glGenTextures(1, &texture_id);
   glBindTexture(GL_TEXTURE_2D, texture_id);
   // We are configuring texture wrapper, each per dimension,s:x, t:y.
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, texture_mode);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, texture_mode);
   // Define the interpolation behavior for this texture.
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -262,46 +261,125 @@ void RenderScene(const wvu::ShaderProgram& shader_program,
 
 void ConstructModels(std::vector<Model*>* models_to_draw) 
 {
-  // Load model.
-  std::vector<Eigen::Vector3f> model_vertices;
-  std::vector<Eigen::Vector2f> model_texels;
-  std::vector<Eigen::Vector3f> model_normals;
-  std::vector<wvu::Face> model_faces;
-  if (!wvu::LoadObjModel(FLAGS_boat_filepath,
-                         &model_vertices,
-                         &model_texels,
-                         &model_normals,
-                         &model_faces)) {
-    std::cout << "Could not load model: " << FLAGS_boat_filepath << std::endl;
-  }
-  std::cout << "Model succesfully loaded! " << std::endl
-            << " Num. Vertices=" << model_vertices.size() << std::endl
-	    << " Num. Texels=" << model_texels.size() << std::endl
-            << " Num. Triangles=" << model_faces.size() << std::endl;
+	
+	// Load Boat
+	{
+	    std::vector<Eigen::Vector3f> model_vertices;
+	    std::vector<Eigen::Vector2f> model_texels;
+	    std::vector<Eigen::Vector3f> model_normals;
+	    std::vector<wvu::Face> model_faces;
+	    if (!wvu::LoadObjModel(FLAGS_boat_filepath,
+	                           &model_vertices,
+	                           &model_texels,
+	                           &model_normals,
+	                           &model_faces)) {
+	      std::cout << "Could not load model: " << FLAGS_boat_filepath << std::endl;
+	    }
+	    std::cout << "Model succesfully loaded! " << std::endl
+	              << " Num. Vertices=" << model_vertices.size() << std::endl
+	  	    << " Num. Texels=" << model_texels.size() << std::endl
+	              << " Num. Triangles=" << model_faces.size() << std::endl;
 
-  Eigen::MatrixXf vertices(3, model_vertices.size());
-  for (int col = 0; col < model_vertices.size(); ++col) 
-  {
-    vertices.col(col) = model_vertices[col];
-  }
+	    Eigen::MatrixXf vertices(3, model_vertices.size());
+	    for (int col = 0; col < model_vertices.size(); ++col) 
+	    {
+	      vertices.col(col) = model_vertices[col];
+	    }
 
-  std::vector<GLuint> indices;
-  for (int face_id = 0; face_id < model_faces.size(); ++face_id) 
-  {
-    const wvu::Face& face = model_faces[face_id];
-    indices.push_back(face.vertex_indices[0]);
-    indices.push_back(face.vertex_indices[1]);
-    indices.push_back(face.vertex_indices[2]);
-  }
+	    std::vector<GLuint> indices;
+	    for (int face_id = 0; face_id < model_faces.size(); ++face_id) 
+	    {
+	      const wvu::Face& face = model_faces[face_id];
+	      indices.push_back(face.vertex_indices[0]);
+	      indices.push_back(face.vertex_indices[1]);
+	      indices.push_back(face.vertex_indices[2]);
+	    }
 
-  Model* model = new Model(Eigen::Vector3f(0, 3, 0),  // Orientation of object.
-              		   Eigen::Vector3f(0, -.5, -3),  // Position of object.
-              		   vertices,
-              		   indices);
+	    Model* boat = new Model(Eigen::Vector3f(1.0f, 3, 0),  // Orientation of object.
+	                		   Eigen::Vector3f(0, -.5, -3),  // Position of object.
+	                		   vertices,
+	                		   indices);
 
-  (*model).SetVerticesIntoGpu();
 
-  (*models_to_draw).push_back(model);
+		boat->set_bob_speed(0.5f);
+	    boat->SetVerticesIntoGpu();
+	    models_to_draw->push_back(boat);
+	}
+	
+	// Load Water
+	{
+	    std::vector<Eigen::Vector3f> model_vertices;
+	    std::vector<Eigen::Vector2f> model_texels;
+	    std::vector<Eigen::Vector3f> model_normals;
+	    std::vector<wvu::Face> model_faces;
+	    if (!wvu::LoadObjModel("./water.obj",
+	                           &model_vertices,
+	                           &model_texels,
+	                           &model_normals,
+	                           &model_faces)) {
+	      std::cout << "Could not load model: " << "./boat.obj" << std::endl;
+	    }
+	    std::cout << "Model succesfully loaded! " << std::endl
+	              << " Num. Vertices=" << model_vertices.size() << std::endl
+	  	    << " Num. Texels=" << model_texels.size() << std::endl
+	              << " Num. Triangles=" << model_faces.size() << std::endl;
+
+	    Eigen::MatrixXf vertices(3, model_vertices.size());
+	    for (int col = 0; col < model_vertices.size(); ++col) 
+	    {
+	      vertices.col(col) = model_vertices[col];
+	    }
+
+	    std::vector<GLuint> indices;
+	    for (int face_id = 0; face_id < model_faces.size(); ++face_id) 
+	    {
+	      const wvu::Face& face = model_faces[face_id];
+	      indices.push_back(face.vertex_indices[0]);
+	      indices.push_back(face.vertex_indices[1]);
+	      indices.push_back(face.vertex_indices[2]);
+	    }
+
+	    Model* water = new Model(Eigen::Vector3f(0, 0, 0),  // Orientation of object.
+	                		   Eigen::Vector3f(0, -0.75, -3),  // Position of object.
+	                		   vertices,
+	                		   indices);
+					   
+	    water->SetVerticesIntoGpu();
+	    models_to_draw->push_back(water);
+		
+	}
+	
+	
+	// Backdrop Quad
+	{
+	    Eigen::MatrixXf vertices(3, 4);
+		vertices.col(0) = Eigen::VectorXf(3);
+		vertices.col(0) << 10.0f, -10.0f, 0.0f;
+			
+		vertices.col(1) = Eigen::VectorXf(3);
+		vertices.col(1) << 10.0f,  10.0f, 0.0f;
+		
+		vertices.col(2) = Eigen::VectorXf(3);
+		vertices.col(2) << -10.0f, -10.0f, 0.0f;
+		
+		vertices.col(3) = Eigen::VectorXf(3);
+		vertices.col(3) << -10.0f,  10.0f, 0.0f;
+
+	    
+	    std::vector<GLuint> indices = {
+			0, 1, 2,
+			1, 2, 3
+		};
+    	
+		Model* backdrop = new Model(Eigen::Vector3f(0.0f, 0.0f, 0.05f),
+		              			Eigen::Vector3f(0.0f, 0, -5.0f),
+								vertices, indices);
+		
+		backdrop->set_rotation_speed(0.8f);
+        backdrop->SetVerticesIntoGpu();
+    	models_to_draw->push_back(backdrop);
+	}
+  
 }
 
 void DeleteModels(std::vector<Model*>* models_to_draw) {
@@ -376,8 +454,11 @@ int main(int argc, char** argv) {
                                               near_plane, far_plane);
   const Eigen::Matrix4f view = Eigen::Matrix4f::Identity();
 
-  const GLuint tex = LoadTexture(FLAGS_boatTex_filepath);
-  std::vector<GLuint> textures = {tex};
+  const GLuint boat = LoadTexture(FLAGS_boatTex_filepath, GL_REPEAT);
+  const GLuint backdrop = LoadTexture("./bg.png", GL_REPEAT);
+  const GLuint water = LoadTexture("./water.jpg", GL_REPEAT);
+
+  std::vector<GLuint> textures = {boat, water, backdrop};
 
   // Loop until the user closes the window.
   while (!glfwWindowShouldClose(window)) {

@@ -34,6 +34,7 @@
 
 #include "model.h"
 #include <iostream>
+#include <math.h>
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -53,7 +54,10 @@ Model::Model(const Eigen::Vector3f& orientation,
   vertex_buffer_object_id_ = 0;
   vertex_array_object_id_ = 0;
   element_buffer_object_id_ = 0;
-  speed = 1;
+  speed_rot = 1;
+  speed_bob = 1;
+  rot_speed_ = 0.0f;
+  bob_speed_ = 0.0f;
 }
 
 Model::Model(const Eigen::Vector3f& orientation,
@@ -67,7 +71,10 @@ Model::Model(const Eigen::Vector3f& orientation,
   vertex_buffer_object_id_ = 0;
   vertex_array_object_id_ = 0;
   element_buffer_object_id_ = 0;
-  speed = 1;
+  speed_rot = 1;
+  speed_bob = 1;
+  rot_speed_ = 0.0f;
+  bob_speed_ = 0.0f;
 }
 
 Model::~Model() {
@@ -78,11 +85,20 @@ Model::~Model() {
 // Builds the model matrix from the orientation and position members.
 Eigen::Matrix4f Model::ComputeModelMatrix() 
 {
-	Eigen::Matrix4f translation = ComputeTranslationMatrix(position_);
-	Eigen::Matrix4f rotation = ComputeRotationMatrix(orientation_.normalized(), orientation_.norm() * speed);
+	Eigen::Vector3f bob = Eigen::Vector3f(0.0f, sin(speed_bob)*0.05f, 0.0f); 
+	Eigen::Matrix4f translation = ComputeTranslationMatrix(position_ + bob);
+	Eigen::Matrix4f rotation = ComputeRotationMatrix(orientation_.normalized(), orientation_.norm() * speed_rot);
 	Eigen::Matrix4f scale = ComputeScalingMatrix(1);
 
   	return translation * rotation * scale;
+}
+
+void Model::set_rotation_speed(const float rotation_speed) {
+	rot_speed_ = rotation_speed;
+}
+
+void Model::set_bob_speed(const float bob_speed) {
+	bob_speed_ = bob_speed;
 }
 
 // Setters set members by *copying* input parameters.
@@ -93,6 +109,14 @@ void Model::set_orientation(const Eigen::Vector3f& orientation) {
 // Setters set members by *copying* input parameters.
 void Model::set_position(const Eigen::Vector3f& position) {
   position_ = position;
+}
+
+float Model::rotation_speed() {
+	return rot_speed_;
+}
+
+float Model::bob_speed() {
+	return bob_speed_;
 }
 
 Eigen::Vector3f* Model::mutable_orientation() {
@@ -165,14 +189,16 @@ void Model::SetVerticesIntoGpu()
   	constexpr GLuint kNumElementsPerVertex = 3;
   	constexpr GLuint kStride = kNumElementsPerVertex * sizeof(vertices(0, 0));
   	const GLvoid* offset_ptr = nullptr;
+	
+	// configure verts
   	glVertexAttribPointer(kIndex, kNumElementsPerVertex, GL_FLOAT, GL_FALSE,
                               kStride, offset_ptr);
   	glEnableVertexAttribArray(kIndex);
 
 	// Configure the texels.
-  	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE,
+  	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE,
                         kStride, offset_ptr);
-  	glEnableVertexAttribArray(2);
+  	glEnableVertexAttribArray(1);
 
   	glBindBuffer(GL_ARRAY_BUFFER, 0);
   	vertex_buffer_object_id_ = vertex_buffer_object_id;
@@ -205,7 +231,8 @@ void Model::Draw(const ShaderProgram& shader_program,
 	const GLint vertex_color_location = glGetUniformLocation(shader_program.shader_program_id(), "vertex_color");
 
   	// The model transformation must be computed using ComputeModelMatrix().
-	speed = .5f * static_cast<GLfloat>(glfwGetTime());
+	speed_rot = rotation_speed() * static_cast<GLfloat>(glfwGetTime());
+	speed_bob = bob_speed() * static_cast<GLfloat>(glfwGetTime());
   	const Eigen::Matrix4f model = ComputeModelMatrix();
 
 	// Bind texture.
